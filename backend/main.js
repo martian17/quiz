@@ -6,7 +6,7 @@ const app = express();
 
 
 const respRecord = {
-    data: JSON.parse(await fs.readFile("responses.json"));
+    data: JSON.parse(await fs.readFile("responses.json")),
     save(){
         fs.writeFileSync("responses.json",data);
     }
@@ -14,7 +14,14 @@ const respRecord = {
         const ts = Date.now()
         
     }
-    get(uid){
+    get(uid,qid){
+        return data.filter(d => 
+            d.uid === uid &&
+            d.qid === qid
+        );
+    }
+    put(uid,qid,response){// response is a list of []
+        data.push({uid,qid,response});
     }
 }
 
@@ -25,6 +32,9 @@ const defaultQuizList = [
         data: JSON.parse(await fs.readFile("./dungeon.json"))
     }
 ];
+
+const defaultUid = "87b87c96-32e7-4c71-92fb-f86d2f6095df";
+
 app.use(function (req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -52,8 +62,15 @@ app.get("/api/quiz/:qid",(req,res)=>{
 app.post("/api/quiz/result",(req,res)=>{
     const {qid,result} = req.body;
     // result: list[q,resp]
-    const uid = "default_uid";
-    respRecord.store();
+    const uid = defaultUid;
+    respRecord.store(uid,qid,result);
+    res.send(200);
+});
+
+app.get("/api/quiz/result/:qid",(req,res)=>{
+    const qid = req.params.qid;
+    const uid = defaultUid;
+    res.send(respRecord.get(uid,qid));
 });
 
 app.listen(5080,()=>{
