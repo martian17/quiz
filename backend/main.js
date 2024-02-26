@@ -4,11 +4,10 @@ const express = M_express.default;
 import {promises as fs} from "fs";
 const app = express();
 
-
 const respRecord = {
     data: JSON.parse(await fs.readFile("responses.json")),
     save(){
-        fs.writeFileSync("responses.json",data);
+        fs.writeFileSync("responses.json",this.data);
     }
     store(uid,qid,result){
         const ts = Date.now()
@@ -21,9 +20,28 @@ const respRecord = {
         );
     }
     put(uid,qid,response){// response is a list of []
-        data.push({uid,qid,response});
+        data.push({uid,qid,time:Date.now(),response});
     }
-}
+};
+
+const completionStateRecord = {
+    data: JSON.parse(await fs.readFile("completionStates.json"));
+    save(){
+        fs.writeFileSync("completionStates.json",this.data);
+    }
+    store(uid,qid,result){
+        const entry = data[uid+qid];
+        for(let key in result){
+            let res = result[key];
+            if(res){
+                entry[key]++;
+            }else{
+                entry[key] = 0;
+            }
+            entry[key] += result[key];
+        }
+    }
+};
 
 const defaultQuizList = [
     {
@@ -56,18 +74,35 @@ app.get("/api/quizList",(req,res)=>{
 app.get("/api/quiz/:qid",(req,res)=>{
     res.send(defaultQuizList.filter(q=>{
         return q.id === req.params.qid
-    }));
+    })[0]);
 });
 
-app.post("/api/quiz/result",(req,res)=>{
-    const {qid,result} = req.body;
+// quiz result type
+/*
+type QuizResult = {
+    uid: string,
+    qid: string,
+    time: numner,
+    response: {
+        // design choice here attempts to compress the json data
+        "words": string[],
+        "responses": number[],
+        // 0: wrong, 1:correct, 2: unanswered
+        "options": string[][]
+    }
+}
+*/
+
+app.post("/api/quiz/:qid/responses",(req,res)=>{
+    const qid = req.param.qid;
+    const {result} = req.body;
     // result: list[q,resp]
     const uid = defaultUid;
     respRecord.store(uid,qid,result);
     res.send(200);
 });
 
-app.get("/api/quiz/result/:qid",(req,res)=>{
+app.get("/api/quiz/:qid/responses",(req,res)=>{
     const qid = req.params.qid;
     const uid = defaultUid;
     res.send(respRecord.get(uid,qid));
