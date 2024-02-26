@@ -118,7 +118,7 @@ const verlaufToPriority = {
         }
         // already mastered last
         return -1;
-    }
+    },
     random(word,verlauf){
         const positiveStreaks = getPositiveStreaks(verlauf);
         if(positiveStreaks < 3){
@@ -150,7 +150,7 @@ const createOptions = function(word,words){
     },0.3));
     let options = a1.slice(0,3);
     options.push(word);
-    options = options.sort(()=>Math.random()=0.5);
+    options = options.sort(()=>Math.random()>0.5);
     return options;
 };
 

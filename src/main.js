@@ -35,7 +35,7 @@ class History{
 
 
 
-const topPage = function(body){
+const topPage = async function(body){
     body.destroy();
     body.add("H1",0,"Quiz Währen");
     const listWrapper = body.add("div");
@@ -63,7 +63,7 @@ const repeat = function(str,n){
     return res;
 }
 
-const quizTop = function(body){
+const quizTop = async function(body){
     body.destroy();
     body.add("H1",0,`Beginnen ${ctx.qname}`);
     body.add("p",0,repeat("lorem ipsum ",20));
@@ -111,101 +111,101 @@ class Counter extends ELEM{
 
 
 
-const quizMain = async function(body){
-    body.destroy();
-    let ui = {};
-    {
-        ui.wrapper = body.add("div",{class: "diamond quiz-wrapper"});
-        ui.wrapper.add("div",{class: "top"});
-    }
-}
-
-
 // const quizMain = async function(body){
-//     // local enums
-//     const HIDDEN = 0;
-//     const CORRECT = 1;
-//     const WRONG = 2;
-// 
 //     body.destroy();
-//     let e_wrapper = body.add("div",{class:"diamond quiz-wrapper"});
-//     e_wrapper.add("div",{class:"top"},`${ctx.qname}`);
-//     let e_counter = e_wrapper.add(QuizCounter.create());
-//     let e_q = e_wrapper.add("div");
-//     let icons = e_wrapper.add("div",{class:"icon-wrapper"},0,{position:"relative"}).T(it=>{
-//         const correct = it.add("div",{class:"icon-correct"});
-//         const wrong = it.add("div",{class:"icon-wrong"});
-//         return {
-//             set state(state){
-//                 correct.style({display: state === CORRECT ? "block" : "hidden"});
-//                 wrong.style({display: state === WRONG ? "block" : "hidden"});
-//             }
-//         }
-//     });
-//     let o_options = e_wrapper.add("div").T(it=>{
-//         let l_options;
-//         return {
-//             newQuestion({question,options}){
-//                 it.destroy();
-//                 l_options = [];
-//                 for(let option of options){
-//                     
-//                     const e_opt = it.add("div",{class:"option",class:"option"}).I(
-//                         it=>it.on("click",()=>{
-//                             l_options.map(op=>op.select(choice));
-//                             if(option === question){
-//                                 icons.state = CORRECT;
-//                             }else{
-//                                 icons.state = WRONG;
-//                             }
-//                         })
-//                     );
-//                     l_options.push({
-//                         select(choice){
-//                             e_opt.disabled = true;
-//                             if(option === question){
-//                                 e_opt.classList.add("correct");
-//                             }else if(option === choice){
-//                                 e_opt.classList.add("wrong");
-//                             }else{
-//                                 e_opt.classList.add("unselected");
-//                             }
-//                         }
-//                     });
-//                 }
-//             }
-//             showAnswer(){
-//             },
-//         }
-//     });
-// 
-//     let e_next = e_wrapper.add("div",0,"Weiter");
-//     let e_prev = e_wrapper.add("div",0,"Zuruck").I(it=>it.disabled = true);
-// 
-//     const quiz = createQuiz(ctx.qid,ctx);
-//     const responseArray = [];
-//     const response = {
-//         words: quiz.map(v=>v.question),
-//         options: quiz.map(v=>v.options),
-//         responses: responseArray
-//     };
-// 
-//     
-//     for(let {question,options} of quiz){
-//         for(let ans of options){
-//             e_options.destroy();
-//             let e_option = e_options.add("div",{class:"diamond"});
-//             e_option.add("div",0,ctx.ansToQ.get(ans));
-//             e_option.on("click",()=>{
-// 
-//             });
-//         }
-//     }
-//     
-//     const displayOptions = async function(){
-//         
+//     let ui = {};
+//     {
+//         ui.wrapper = body.add("div",{class: "diamond quiz-wrapper"});
+//         ui.wrapper.add("div",{class: "top"});
 //     }
 // }
+
+
+const quizMain = async function(body){
+    // local enums
+    const HIDDEN = 0;
+    const CORRECT = 1;
+    const WRONG = 2;
+
+    body.destroy();
+    let e_wrapper = body.add("div",{class:"diamond quiz-wrapper"});
+    e_wrapper.add("div",{class:"top"},`${ctx.qname}`);
+    let e_counter = e_wrapper.add(QuizCounter.create());
+    let e_q = e_wrapper.add("div");
+    let icons = e_wrapper.add("div",{class:"icon-wrapper"},0,{position:"relative"}).T(it=>{
+        const correct = it.add("div",{class:"icon-correct"});
+        const wrong = it.add("div",{class:"icon-wrong"});
+        return {
+            set state(state){
+                correct.style({display: state === CORRECT ? "block" : "hidden"});
+                wrong.style({display: state === WRONG ? "block" : "hidden"});
+            }
+        }
+    });
+    let o_options = e_wrapper.add("div").T(it=>{
+        let l_options;
+        return {
+            newQuestion({question,options}){
+                it.destroy();
+                l_options = [];
+                for(let option of options){
+                    
+                    const e_opt = it.add("div",{class:"option",class:"option"}).I(
+                        it=>it.on("click",()=>{
+                            l_options.map(op=>op.select(choice));
+                            if(option === question){
+                                icons.state = CORRECT;
+                            }else{
+                                icons.state = WRONG;
+                            }
+                        })
+                    );
+                    l_options.push({
+                        select(choice){
+                            e_opt.disabled = true;
+                            if(option === question){
+                                e_opt.classList.add("correct");
+                            }else if(option === choice){
+                                e_opt.classList.add("wrong");
+                            }else{
+                                e_opt.classList.add("unselected");
+                            }
+                        }
+                    });
+                }
+            },
+            showAnswer(){
+            },
+        }
+    });
+
+    let e_next = e_wrapper.add("div",0,"Weiter");
+    let e_prev = e_wrapper.add("div",0,"Zuruck").I(it=>it.disabled = true);
+
+    const quiz = createQuiz(ctx.qid,ctx);
+    const responseArray = [];
+    const response = {
+        words: quiz.map(v=>v.question),
+        options: quiz.map(v=>v.options),
+        responses: responseArray
+    };
+
+    
+    for(let {question,options} of quiz){
+        for(let ans of options){
+            e_options.destroy();
+            let e_option = e_options.add("div",{class:"diamond"});
+            e_option.add("div",0,ctx.ansToQ.get(ans));
+            e_option.on("click",()=>{
+
+            });
+        }
+    }
+    
+    const displayOptions = async function(){
+        
+    }
+}
 
 const quizResult = function(body){
     body.destroy();
