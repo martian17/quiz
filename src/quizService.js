@@ -1,4 +1,4 @@
-import {get, post, addBus} from "./util.mjs";
+import {get, post, addBus} from "./util.js";
 
 
 

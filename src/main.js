@@ -1,171 +1,232 @@
 import {ELEM, CSS} from "htmlgen";
-import {get, post, addBus} from "./util.mjs";
+import {get, post, addBus} from "./util.js";
+import {createQuiz} from "./quizService.js";
 
+const ctx = {
+    history: new History,
+    quizMode: "repeat",
 
-class Options extends ELEM{
-    // list[label,value]
-    static create(options){
-        const op = new Options("div",{class:"options"});
-        let selected;
-        for(let [label,value] of options){
-            const btn = op.add("div",{class: "diamond button"},label);
-            btn.on("click",()=>{
-                this.value = value;
-                op.emit("select",value);
-                if(selected)selected.e.classList.remove("selected");
-                selected = btn;
-                selected.e.classList.add("selected");
-            });
+};
+
+class History{
+    stack = [];
+    idx = -1;
+    add(itme){
+        this.stack[++this.idx] = item;
+        this.stack.length = this.idx+1;
+    }
+    weiter(){
+        if(!this.stack[this.idx+1]){
+            return undefined;
         }
-        return op;
+        return this.stack[++this.idx]
+    }
+    zuruck(){
+        if(this.idx <= 0){
+            return undefined;
+        }
+        return this.stack[--this.idx];
+    }
+    clear(){
+        this.stck = [];
+        this.idx = -1;
     }
 }
 
-addBus(Options);
 
-const topPage = async function(body){
+
+const topPage = function(body){
     body.destroy();
-    body.add("h1",0,"Bitte wählen Sie ein Quiz aus");
+    body.add("H1",0,"Quiz Währen");
     const listWrapper = body.add("div");
+    let disabled = false;
     for(let {name,id} of await get("/quizList")){
-        const item = listWrapper.add("div",{class:"itemButton diamond"});
-        item.add("span",0,name);
-        const button = item.add("div",{class:"button"},"Weiter");
+        const item = listWrapper.add("div",{class:"diamond"});
+        item.add("h2",0,name);
+        item.add("span",0,"Weiter->");
         item.on("click",()=>{
-            ctx.id = id;
-            quizOptionPage(body);
+            if(disabled)return;
+            disabled = true;
+            ctx.qid = id;
+            ctx.qname = name;
+            ctx.history.add(topPage);
+            quizTop(body);
         });
     }
 }
 
-const quizTop = 
+const repeat = function(str,n){
+    let res = "";
+    for(let i = 0; i < n; i++){
+        res += str;
+    }
+    return res;
+}
+
+const quizTop = function(body){
+    body.destroy();
+    body.add("H1",0,`Beginnen ${ctx.qname}`);
+    body.add("p",0,repeat("lorem ipsum ",20));
+    let disabled = false;
+    // control wrapper
+    const cw = body.add("div");
+    cw.add("div",{class:"diamond"},"Zuruck").on("click",()=>{
+        if(disabled)return;
+        let page = ctx.history.zuruck();
+        if(!page)return;
+        disabled = true;
+        page(body);
+    });
+    cw.add("div",{class:"diamond"},"Weiter").on("click",()=>{
+        if(disabled)return;
+        disabled = true;
+        ctx.history.add(quizTop);
+        quizMain(body);
+    });
+};
+
+
+
+class Counter extends ELEM{
+    cap = 0;
+    n = 0;
+    create(cap){
+        const c = new Counter;
+        c.cap = cap;
+        c.e = document.createElement("div");
+        c.e.classList.add("pie");
+        c.label = c.add("div");
+        c.setValue(0);
+        return c;
+    }
+    setValue(n){
+        const {cap} = this;
+        this.n = n;
+        const p = (n/cap)*100;
+        this.label.setInner(`${n}/${this.cap}`);
+        this.style({background:`background: conic-gradient(red 0% ${p}%, #0000 ${p}%);`});
+    }
+}
 
 
 
 
+const quizMain = async function(body){
+    body.destroy();
+    let ui = {};
+    {
+        ui.wrapper = body.add("div",{class: "diamond quiz-wrapper"});
+        ui.wrapper.add("div",{class: "top"});
+    }
+}
 
-// const ctx = {};
+
+// const quizMain = async function(body){
+//     // local enums
+//     const HIDDEN = 0;
+//     const CORRECT = 1;
+//     const WRONG = 2;
 // 
-// const quizOptionPage = async function(body){
-//     console.log("loading quiz option page");
-//     body.add("H1",0,"Bitte wählen Sie das Einstellung für das Quiz aus");
-//     const wrapper = body.add("div",{class: "content-wrapper"},0,{display:"flex","align-items":"center","flex-direction": "column","gap":"1em"});
-// 
-//     const b1 = wrapper.add("div",{class: "sbox"});
-//     b1.add("h2",{},"Wie lange willst du das Quiz sind?",{"text-align":"center",margin:"0px"});
-//     let bereit = false;
-//     const lengthE = b1.add(Options.create([["10",10],["20",20],["50",50],["100",100]]))
-//     lengthE.on("select",(val)=>{
-//         bereit = true;
-//         ctx.length = val;
-//         weiter.e.classList.remove("disabled");
-//     });
-// 
-//     const weiter = wrapper.add("div",{class: "diamond button disabled"},"weiter");
-//     weiter.on("click",()=>{
-//         if(!bereit)return;
-//         destroy();
-//         quizPage(body);
-//     });
-//     const destroy = () => body.destroy();
-// }
-// 
-// const createQuiz = function(data,size){
-//     const words = data.sort(()=>Math.random()-0.5).slice(0,size);
-//     let res = [];
-//     for(let word of words){
-//         const options = [word[1]];
-//         for(let i = 0; i < 3; i++){
-//             const idx = Math.floor(Math.random()*data.length);
-//             r.options.push(data[idx][1]);
+//     body.destroy();
+//     let e_wrapper = body.add("div",{class:"diamond quiz-wrapper"});
+//     e_wrapper.add("div",{class:"top"},`${ctx.qname}`);
+//     let e_counter = e_wrapper.add(QuizCounter.create());
+//     let e_q = e_wrapper.add("div");
+//     let icons = e_wrapper.add("div",{class:"icon-wrapper"},0,{position:"relative"}).T(it=>{
+//         const correct = it.add("div",{class:"icon-correct"});
+//         const wrong = it.add("div",{class:"icon-wrong"});
+//         return {
+//             set state(state){
+//                 correct.style({display: state === CORRECT ? "block" : "hidden"});
+//                 wrong.style({display: state === WRONG ? "block" : "hidden"});
+//             }
 //         }
-//         options.sort(()=>Math.random()-0.5);
-//         res.push({
-//             q: word[0],
-//             a: word[1],
-//             options
-//         });
-//     }
-//     return res;
-// }
+//     });
+//     let o_options = e_wrapper.add("div").T(it=>{
+//         let l_options;
+//         return {
+//             newQuestion({question,options}){
+//                 it.destroy();
+//                 l_options = [];
+//                 for(let option of options){
+//                     
+//                     const e_opt = it.add("div",{class:"option",class:"option"}).I(
+//                         it=>it.on("click",()=>{
+//                             l_options.map(op=>op.select(choice));
+//                             if(option === question){
+//                                 icons.state = CORRECT;
+//                             }else{
+//                                 icons.state = WRONG;
+//                             }
+//                         })
+//                     );
+//                     l_options.push({
+//                         select(choice){
+//                             e_opt.disabled = true;
+//                             if(option === question){
+//                                 e_opt.classList.add("correct");
+//                             }else if(option === choice){
+//                                 e_opt.classList.add("wrong");
+//                             }else{
+//                                 e_opt.classList.add("unselected");
+//                             }
+//                         }
+//                     });
+//                 }
+//             }
+//             showAnswer(){
+//             },
+//         }
+//     });
 // 
-// const quizPage = async function(body){
-//     console.log("loading quiz page");
-//     const data = (await get(`/quiz/${ctx.id}`)).data;
-//     const quiz = createQuiz(data,ctx.length);
-//     const wrapper = body.add("div",{class:"diamond"});
-//     const counter = wrapper.add("div",{class:"couter"});
-//     const qf = wrapper.add("div",{class:"diamond"});
-//     const afs = wrapper.add("div");
-//     let score = 0;
-//     const responses = [];
-//     for(let i = 0; i < quiz.length; i++){
-//         counter.setInner(`${score}/${i}/${ctx.length}`)
-//         const frage = quiz[i];
-//         qf.setInner(frage.q);
-//         afs.destroy();
-//         const btns = [];
-//         for(let op of frage.options){
-//             const btn = afs.add("div",{class:"diamond button"},op);
-//             btn.on("click",()=>{
-//                 answer(op);
+//     let e_next = e_wrapper.add("div",0,"Weiter");
+//     let e_prev = e_wrapper.add("div",0,"Zuruck").I(it=>it.disabled = true);
+// 
+//     const quiz = createQuiz(ctx.qid,ctx);
+//     const responseArray = [];
+//     const response = {
+//         words: quiz.map(v=>v.question),
+//         options: quiz.map(v=>v.options),
+//         responses: responseArray
+//     };
+// 
+//     
+//     for(let {question,options} of quiz){
+//         for(let ans of options){
+//             e_options.destroy();
+//             let e_option = e_options.add("div",{class:"diamond"});
+//             e_option.add("div",0,ctx.ansToQ.get(ans));
+//             e_option.on("click",()=>{
+// 
 //             });
-//             btns.push(btn);
-//         }
-//         const answer = function(ans){
-//             responses.push([frage,ans]);
-//             for(let btn of buttons){
-//                 btn.e.classList.add("disabled");
-//             }
-//             if(ans === frage.a){
-//                 for(let i = 0; i < btns.length; i++){
-//                     const btn = btns[i];
-//                     btn.e.classlist.add("disabled");
-//                     if(frage.options[i] === frage.a){
-//                         btn.e.classlist.add("correct success");
-//                     }
-//                 }
-//                 score++;
-//             }else{
-//                 for(let i = 0; i < btns.length; i++){
-//                     const btn = btns[i];
-//                     btn.e.classlist.add("disabled");
-//                     if(frage.options[i] === frage.a){
-//                         btn.e.classlist.add("correct");
-//                     }else if(frage.options[i] === ans){
-//                         btn.e.classList.add("wrong");
-//                     }
-//                 }
-//                 wrongs.push([frage,ans]);
-//             }
 //         }
 //     }
-//     // log the response to the backend
-//     // display the report page with the result
-//     return responses;
+//     
+//     const displayOptions = async function(){
+//         
+//     }
 // }
-// 
-// 
-// const startPage = async function(body){
-//     console.log(body);
-//     body.add("h1",0,"Bitte wählen Sie ein Quiz aus");
-//     // Liste der Quizze
-//     const listWrapper = body.add("div");
-//     const list = await get("/quizList");
-//     console.log(list);
-//     list.map(({name,id})=>{
-//         const item = listWrapper.add("div",{class:"itemButton diamond"});
-//         item.add("span",0,name);
-//         const button = item.add("div",{class:"button"},"Weiter");
-//         item.on("click",()=>{
-//             destroy();
-//             ctx.id = id;
-//             quizOptionPage(body);
-//         });
-//     });
-//     const destroy = () => body.destroy();
-// }
-// 
-// startPage(ELEM.fromElement(document.body));
-// //quizOptionPage(ELEM.fromElement(document.body));
-// 
+
+const quizResult = function(body){
+    body.destroy();
+    body.add("h1","Ergebnis");
+    let disabled = false;
+    const cw = body.add("div");
+    cw.add("div",{class:"diamond"},"Weider versuchen",()=>{
+        if(disabled)return;
+        disabled = true;
+        ctx.history.push(quizResult);
+        quizTop(body);
+    });
+    cw.add("div",{class:"diamond"},"Zuruck",()=>{
+        if(disabled)return;
+        disabled = true;
+        ctx.history.push(quizResult);
+        topPage(body);
+    });
+}
+
+
+
+
+
