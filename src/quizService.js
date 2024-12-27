@@ -155,7 +155,7 @@ const createOptions = function(word,words){
 };
 
 
-const createQuiz = function(qid,ctx){
+export const createQuiz = function(qid,ctx){
     // fetch necessary information
     const words = get(`/quiz/${qid}`);
     const resps = get(`/quiz/${qid}/responses`);

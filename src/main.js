@@ -2,11 +2,52 @@ import {ELEM, CSS} from "htmlgen";
 import {get, post, addBus} from "./util.js";
 import {createQuiz} from "./quizService.js";
 
-const ctx = {
-    history: new History,
-    quizMode: "repeat",
 
+
+window.addEventListener("popState",(e)=>{
+    const {state} = e;
+});
+
+const normalizePath = function(path){
+    let res = "";
+    for(let i = 0; i < path.length; i++){
+        let c = path[i];
+        if(c === "/"){
+            if(path[i-1] === "/")continue;
+            res += "/";
+        }else{
+            res += c;
+        }
+    }
+    if(res.at(-1) === "/")res = res.slice(0,-1);
+    if(res === "")res = "/";
+    return res;
 };
+
+
+const body = ELEM.from(document.body);
+
+class Router{
+    routeMap = new Map;
+    add(path,loader){
+        path = normalizePath(path);
+        this.routeMap.set(path,loader);
+    }
+    load(path,args){
+        const loader = this.routeMap.get(path);
+        loader(body);
+    }
+}
+
+const router = new Router;
+
+const loadCurrent = function(){
+    const url = new URL(window.location);
+    const path = url.pathname;
+    if(path === "/")path = "/topPage";
+    router.load(path);
+}
+
 
 class History{
     stack = [];
@@ -35,6 +76,7 @@ class History{
 
 
 
+
 const topPage = async function(body){
     body.destroy();
     body.add("H1",0,"Quiz Währen");
@@ -54,6 +96,7 @@ const topPage = async function(body){
         });
     }
 }
+router.add("/top",topPage);
 
 const repeat = function(str,n){
     let res = "";
@@ -84,6 +127,7 @@ const quizTop = async function(body){
         quizMain(body);
     });
 };
+router.add("/quizTop",quizTop);
 
 
 
@@ -150,7 +194,7 @@ const quizMain = async function(body){
                 l_options = [];
                 for(let option of options){
                     
-                    const e_opt = it.add("div",{class:"option",class:"option"}).I(
+                    const e_opt = it.add("div",{class:"option"}).I(
                         it=>it.on("click",()=>{
                             l_options.map(op=>op.select(choice));
                             if(option === question){
@@ -230,3 +274,14 @@ const quizResult = function(body){
 
 
 
+
+
+
+
+// execution start
+const ctx = {
+    history: new History,
+    quizMode: "repeat",
+};
+
+loadCurrent();

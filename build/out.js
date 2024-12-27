@@ -702,18 +702,194 @@
   };
 
   // src/util.js
+  var apiUrl = "http://localhost:5080/api";
   ELEM.prototype.destroy = function() {
     let children = [...this.children];
     for (let child of children) {
       child.remove();
     }
   };
+  var get = async function(path) {
+    return await (await fetch(apiUrl + path)).json();
+  };
+
+  // src/quizService.js
+  var zip = function* (...args) {
+    let baseArr = [];
+    for (let i = 0; i < args[0].length; i++) {
+      for (let j = 0; j < args.length; j++) {
+        baseArr[j] = args[j][i];
+      }
+      yield baseArr;
+    }
+  };
+  var newarr = function(n) {
+    const arr = [];
+    for (let i = 0; i < n; i++) {
+      arr.push(n);
+    }
+    return arr;
+  };
+  var editDistance = function(a, b) {
+    const rl = a.length + 1;
+    const cl = b.length + 1;
+    const arr = newarr(rl * cl);
+    for (let i = 0; i < rl; i++) {
+      arr[i] = i;
+    }
+    for (let i = 0; i < cl; i++) {
+      arr[rl * i] = i;
+    }
+    for (let bi = 1; bi < cl; bi++) {
+      for (let ai = 1; ai < rl; ai++) {
+        const idx = bi * rl + ai;
+        const nn = arr[idx - rl];
+        const ww = arr[idx - 1];
+        const nw = arr[idx - rl - 1];
+        if (a[ai - 1] === b[bi - 1]) {
+          arr[idx] = nw;
+        } else {
+          let mv = ww;
+          if (nn < mv)
+            mv = nn;
+          if (nw < mv)
+            mv = nw;
+          arr[idx] = mv + 1;
+        }
+      }
+    }
+    return arr.at(-1);
+  };
+  var similarityScore = function(a, b) {
+    const ed = editDistance(a, b);
+    return ed / (a + b);
+  };
+  var zipResponses = function(words, resps) {
+    let history = {};
+    for (let [word] of words) {
+      streaks[word] = [];
+    }
+    for (let { words: words2, responses } of resps) {
+      for (let [word, resp] of zip(words2, responses)) {
+        history[word].push(resp);
+      }
+    }
+    return history;
+  };
+  var verlaufToPriority = {
+    repeat: function(word, verlauf) {
+      const positiveStreaks = getPositiveStreaks(verlauf);
+      const negativeStreaks = getNegativeStreaks(verlauf);
+      let val = 0;
+      if (negativeStreaks) {
+        return negativeStreaks + 20;
+      }
+      if (positiveSteaks < 3) {
+        return positiveStreaks;
+      }
+      return -1;
+    },
+    sweep(word, verlauf) {
+      const positiveStreaks = getPositiveStreaks(verlauf);
+      const negativeStreaks = getNegativeStreaks(verlauf);
+      let val = 0;
+      if (negativeStreaks) {
+        return negativeStreaks + 20;
+      }
+      if (positiveSteaks < 3) {
+        return 3 - positiveStreaks;
+      }
+      return -1;
+    },
+    random(word, verlauf) {
+      const positiveStreaks = getPositiveStreaks(verlauf);
+      if (positiveStreaks < 3) {
+        return 1;
+      }
+      return -1;
+    }
+  };
+  var noisySort = function(cb, noiseLevel) {
+    return function(a, b) {
+      if (a === b || Math.random() < noiseLevel) {
+        return Math.random() - 0.5;
+      }
+      return cb(a, b);
+    };
+  };
+  var createOptions = function(word, words) {
+    let a1 = [];
+    for (let [w1] of words) {
+      if (w1 === word)
+        continue;
+      const s = similarityScore(word, w1);
+      a1.push([w1, s]);
+    }
+    a1 = a1.sort(noisySort((a, b) => {
+      return b[1] - a[1];
+    }, 0.3));
+    let options = a1.slice(0, 3);
+    options.push(word);
+    options = options.sort(() => Math.random() > 0.5);
+    return options;
+  };
+  var createQuiz = function(qid, ctx2) {
+    const words = get(`/quiz/${qid}`);
+    const resps = get(`/quiz/${qid}/responses`);
+    ctx2.ansToQ = new Map(words);
+    ctx2.qToAns = new Map(words.map(([a, b]) => [b, a]));
+    const verlaufs = zipResponses(words, resps);
+    const chosen = verlaufs.sort(([w1, v1], [w2, v2]) => {
+      const p1 = verlaufToPriority[ctx2.quizMode](w1, v1);
+      const p2 = verlaufToPriority[ctx2.quizMode](w2, v2);
+      if (p1 === p2)
+        return Math.random() - 0.5;
+      return p2 - p1;
+    }).map(([w, v]) => w).slice(0, ctx2.quizLength);
+    const answerMap = new Map(words);
+    return chosen.map((w) => {
+      return {
+        question: w,
+        options: createOptions(w, words)
+      };
+    });
+  };
 
   // src/main.js
-  var ctx = {
-    history: new History(),
-    quizMode: "repeat"
+  window.addEventListener("popState", (e) => {
+    const { state } = e;
+  });
+  var normalizePath = function(path) {
+    let res = "";
+    for (let i = 0; i < path.length; i++) {
+      let c = path[i];
+      if (c === "/") {
+        if (path[i - 1] === "/")
+          continue;
+        res += "/";
+      } else {
+        res += c;
+      }
+    }
+    if (res.at(-1) === "/")
+      res = res.slice(0, -1);
+    if (res === "")
+      res = "/";
+    return res;
   };
+  var body = ELEM.from(document.body);
+  var Router = class {
+    routeMap = /* @__PURE__ */ new Map();
+    add(path, loader) {
+      path = normalizePath(path);
+      this.routeMap.set(path, loader);
+    }
+    load(path, args) {
+      const loader = this.routeMap.get(path);
+      loader(body);
+    }
+  };
+  var router = new Router();
   var History = class {
     stack = [];
     idx = -1;
@@ -737,5 +913,136 @@
       this.stck = [];
       this.idx = -1;
     }
+  };
+  var topPage = async function(body2) {
+    body2.destroy();
+    body2.add("H1", 0, "Quiz W\xE4hren");
+    const listWrapper = body2.add("div");
+    let disabled = false;
+    for (let { name, id } of await get("/quizList")) {
+      const item2 = listWrapper.add("div", { class: "diamond" });
+      item2.add("h2", 0, name);
+      item2.add("span", 0, "Weiter->");
+      item2.on("click", () => {
+        if (disabled)
+          return;
+        disabled = true;
+        ctx.qid = id;
+        ctx.qname = name;
+        ctx.history.add(topPage);
+        quizTop(body2);
+      });
+    }
+  };
+  router.add("/top", topPage);
+  var repeat = function(str, n) {
+    let res = "";
+    for (let i = 0; i < n; i++) {
+      res += str;
+    }
+    return res;
+  };
+  var quizTop = async function(body2) {
+    body2.destroy();
+    body2.add("H1", 0, `Beginnen ${ctx.qname}`);
+    body2.add("p", 0, repeat("lorem ipsum ", 20));
+    let disabled = false;
+    const cw = body2.add("div");
+    cw.add("div", { class: "diamond" }, "Zuruck").on("click", () => {
+      if (disabled)
+        return;
+      let page = ctx.history.zuruck();
+      if (!page)
+        return;
+      disabled = true;
+      page(body2);
+    });
+    cw.add("div", { class: "diamond" }, "Weiter").on("click", () => {
+      if (disabled)
+        return;
+      disabled = true;
+      ctx.history.add(quizTop);
+      quizMain(body2);
+    });
+  };
+  router.add("/quizTop", quizTop);
+  var quizMain = async function(body2) {
+    const HIDDEN = 0;
+    const CORRECT = 1;
+    const WRONG = 2;
+    body2.destroy();
+    let e_wrapper = body2.add("div", { class: "diamond quiz-wrapper" });
+    e_wrapper.add("div", { class: "top" }, `${ctx.qname}`);
+    let e_counter = e_wrapper.add(QuizCounter.create());
+    let e_q = e_wrapper.add("div");
+    let icons = e_wrapper.add("div", { class: "icon-wrapper" }, 0, { position: "relative" }).T((it) => {
+      const correct = it.add("div", { class: "icon-correct" });
+      const wrong = it.add("div", { class: "icon-wrong" });
+      return {
+        set state(state) {
+          correct.style({ display: state === CORRECT ? "block" : "hidden" });
+          wrong.style({ display: state === WRONG ? "block" : "hidden" });
+        }
+      };
+    });
+    let o_options = e_wrapper.add("div").T((it) => {
+      let l_options;
+      return {
+        newQuestion({ question, options }) {
+          it.destroy();
+          l_options = [];
+          for (let option of options) {
+            const e_opt = it.add("div", { class: "option" }).I(
+              (it2) => it2.on("click", () => {
+                l_options.map((op) => op.select(choice));
+                if (option === question) {
+                  icons.state = CORRECT;
+                } else {
+                  icons.state = WRONG;
+                }
+              })
+            );
+            l_options.push({
+              select(choice2) {
+                e_opt.disabled = true;
+                if (option === question) {
+                  e_opt.classList.add("correct");
+                } else if (option === choice2) {
+                  e_opt.classList.add("wrong");
+                } else {
+                  e_opt.classList.add("unselected");
+                }
+              }
+            });
+          }
+        },
+        showAnswer() {
+        }
+      };
+    });
+    let e_next = e_wrapper.add("div", 0, "Weiter");
+    let e_prev = e_wrapper.add("div", 0, "Zuruck").I((it) => it.disabled = true);
+    const quiz = createQuiz(ctx.qid, ctx);
+    const responseArray = [];
+    const response = {
+      words: quiz.map((v) => v.question),
+      options: quiz.map((v) => v.options),
+      responses: responseArray
+    };
+    for (let { question, options } of quiz) {
+      for (let ans of options) {
+        e_options.destroy();
+        let e_option = e_options.add("div", { class: "diamond" });
+        e_option.add("div", 0, ctx.ansToQ.get(ans));
+        e_option.on("click", () => {
+        });
+      }
+    }
+    const displayOptions = async function() {
+    };
+  };
+  var ctx = {
+    history: new History(),
+    quizMode: "repeat"
   };
 })();
